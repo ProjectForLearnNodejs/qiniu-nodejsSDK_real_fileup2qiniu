@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>文件上传</title>
+  <link rel="stylesheet" href="bootstrap/dist/css/bootstrap.css">
+  <link rel="stylesheet" href="css/jquery.alerts.css">
+  <link type="text/css" rel="stylesheet" href="css/materialize.css"  media="screen,projection"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+
+  <style>
+    .header {
+      width:100%;
+      height:60px;
+      background-color: #00B8EE;
+    }
+    #image-view {
+
+    }
+  </style>
+</head>
+<body>
+<div id="wrapper">
+  <div class="header light-blue lighten-1">
+    <span style="float:right;font-size:20px;line-height:3.0;margin-right:20px;color:#e1f5fe;">文件上传服务器</span>
+  </div>
+  <div class="container clearfix" style="width:100%;">
+    <div id="chose-picture">
+      <form  name="file-form" method="post" id="file-form" role="form" enctype="multipart/form-data">
+        <input style="margin:10px 0px 0px 10px;" id="file" name="file" class="file" onchange="uploadTOlocal();" type="file">
+        </input>
+      </form>
+      <a class="btn btn-default" id="start_upload" style="margin: 10px 0px 0px 10px;" onclick="uploadToqiniu()">
+        <i class="icon-star"></i>
+        <span>开始上传</span>
+      </a>
+      <table style="width:800px;margin:30px 0px 0px 10px;" id="file-info" class="table table-striped table-hover">
+        <thead>
+        <tr>
+          <th style="width:20%;">文件名</th>
+          <th style="width:20%;">大小</th>
+          <th style="width:20%;">详情</th>
+          <th style="width:30%;"></th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="footer">
+  </div>
+</div>
+<script type="text/javascript" src="jquery/dist/jquery.min.js"></script>
+<script type="text/javascript" src="js/jquery.alerts.js"></script>
+<script type="text/javascript" src="js/jquery.form.js"></script>
+<script type="text/javascript" src="common.js"></script>
+<script type="text/javascript" src="js/materialize.js"></script>
+
+<script type="text/javascript">
+  var Domain =  '7xqqm5.com1.z0.glb.clouddn.com';    // 七牛子域名，自定义域名。
+  //文件上传至业务服务器
+  function uploadTOlocal(){
+    $( "#file-form" ).ajaxSubmit({
+      type:'POST',
+      url:"api/files/uploadtolocal",
+      dataType: "json",
+      success:function(data){
+        if(data.code == 1){
+          var html = '<tr data-file_name="'+data.result[0].originalname+'">'
+                  +'<td>'+data.result[0].originalname+'</td>'
+                  +'<td>'+data.result[0].size+'B'+'</td>'
+                  +'<td>'+'未上传'+'</td>'
+                  +'<td>请上传</td>'
+          '</tr>';
+          $('#file-info tbody').append(html);
+        }else{
+          jAlert(data.msg, "提示");
+        }
+      }
+    });
+  }
+
+  // 文件上传至七牛
+  function uploadToqiniu() {
+    var fileArr = [];
+    // 遍历DOM树，获取需要上传的文件
+    $('#file-info tbody').find('tr').each(function(index, ele) {
+      var text = $(this).find('td:eq(2)').text();
+      if(text == '未上传') {    // 如果文件未上传,则放入数组中
+        fileArr.push($(this).find('td:eq(0)').text());
+      }
+    });
+
+    if(fileArr.length == 0) {
+      jAlert('请先选择文件！', '提示');
+      return;
+    }
+    $.ajax({
+      url : 'api/files/uploadtoqiniu',
+      type : 'POST',
+      data : {
+        "fileArr" : fileArr.toString(),
+      },
+      dataType : 'json',
+      success: function(data) {
+        var key = data.result.key;
+        if(data.code == 1) {    // 上传成功！
+          // 如果文件是图片，则添加预览和下载功能（默认上传的资源为公有资源，私有资源必须通过手动设置）
+          var htmlStr;
+          if(isImage(key)) {
+            htmlStr = '<img alt="" src="http://'+Domain+'/'+key+'" width="100" height="100" class="materialboxed">';
+            // 找到当前列
+            $("tr[data-file_name='"+key+"']").find('td:eq(3)').text('').append(htmlStr);
+          }else{   // 如果不是，则添加下载功能
+            htmlStr = '<a type="button" class="btn btn-primary" href="http://'+Domain+'/'+key+'">下载</a>';
+            $("tr[data-file_name='"+key+"']").find('td:eq(3)').text('').append(htmlStr);
+          }
+          // 改变上传状态为已上传
+          $("tr[data-file_name='"+key+"']").find('td:eq(2)').text('已上传');
+        }else{      // 上传失败
+          jAlert('上传失败,请重新添加', '提示');
+          $("tr[data-file_name='"+key+"']").find('td:eq(3)').text('上传失败');
+        }
+        // 将文件数组置为空
+        fileArr.length = 0;
+        // 初始化查看大图效果
+        $('.materialboxed').materialbox();
+      }
+    });
+  }
+</script>
+</body>
+</html>
